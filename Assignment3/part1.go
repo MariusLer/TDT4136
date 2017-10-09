@@ -4,59 +4,65 @@ import (
 	"bufio"
 	"fmt"
 	"log"
+	"math"
 	"os"
 )
 
+const inf = int(math.MaxInt32 >> 1)
+
 type node struct {
-	x int
 	y int
+	x int
 
 	g int
-	h int
 	f int
 
-	status int // 1 = open, 0 = closed
+	block bool
 
 	parent *node
 	kids   []node // In golang []*node and []node both create a slice, so they are the same. Slices are references to an array
 }
 
-func readBoard(board string) (node, node, [][]node) {
-	startnode := node{g: 0, f: 0}
-	endnode := node{}
+type nodes []*node
+
+func (a nodes) Len() int {
+	return len(a)
+}
+
+func (a nodes) Less(i, j int) bool {
+	return a[i].f < a[j].f
+}
+
+func (a nodes) Swap(i, j int) {
+	a[i], a[j] = a[j], a[i]
+}
+
+type coordinates struct {
+	y int
+	x int
+}
+
+func readBoard(board string) (coordinates, coordinates, [][]node) {
+	var startnode coordinates
+	var endnode coordinates
 	currentdir, _ := os.Getwd()
 	file, err := os.Open(currentdir + "/boards/" + board)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
-
 	linecount := 0
-	width := 0
+	board2 := make([][]node, 1)
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		linecount++
-		if width == 0 {
-			line := scanner.Text()
-			for i := range line {
-				width = i + 1
-			}
-		}
-	}
-	board2 := make([][]node, linecount)
-	for i := range board2 {
-		board2[i] = make([]node, width)
-	}
-	scanner = bufio.NewScanner(file)
-	linecount = 0
-	for scanner.Scan() {
+		tempNodeRow := make([]node, 0)
 		line := scanner.Text()
 		for i, c := range line {
 			tempNode := node{x: i, y: linecount}
-			if c == '.' {
-				tempNode.g = 1
-			} else if c == '#' {
-				tempNode.g = 9001
+			tempNode.g = inf
+			tempNode.f = inf
+			if c == '#' {
+				tempNode.block = true
 			} else if c == 'A' {
 				startnode.x = i
 				startnode.y = linecount
@@ -64,17 +70,53 @@ func readBoard(board string) (node, node, [][]node) {
 				endnode.x = i
 				endnode.y = linecount
 			}
-			board2[i][linecount] = tempNode
-			fmt.Println(tempNode)
+			tempNodeRow = append(tempNodeRow, tempNode)
+		}
+		if linecount == 0 {
+			board2[0] = tempNodeRow
+		} else {
+			board2 = append(board2, tempNodeRow)
 		}
 		linecount++
 	}
 	return startnode, endnode, board2
 }
 
+func calculateF(current *node, stop *node) int {
+	return current.g + int(math.Abs(float64(current.x-stop.x))+math.Abs(float64(current.y-stop.y)))
+}
+
+func nodeInSet(nod node, set []*node) bool {
+	for _, elem := range set {
+		if nod.x == elem.x && nod.y == elem.y {
+			return true
+		}
+	}
+	return false
+}
+
+func aStarSolve(startnode coordinates, stopnode coordinates, board [][]node, height int, width int) {
+	open := make([]*node, 1)
+	//closed := make([]*node, 0)
+	open[0] = &board[startnode.y][startnode.x]
+	open[0].g = 0 // startnode cost zero
+	open[0].f = calculateF(&board[startnode.y][startnode.x], &board[stopnode.y][stopnode.x])
+
+}
+
 func main() {
-	startnode, stopnode, _ := readBoard("board-1-1.txt")
-	//fmt.Println(board)
+	startnode, stopnode, board := readBoard("board-1-1.txt")
+	/*
+		for _, row := range board {
+			for _, node := range row {
+				fmt.Print(node)
+			}
+			fmt.Println()
+		}
+	*/
 	fmt.Println(startnode)
 	fmt.Println(stopnode)
+	height := len(board)
+	width := len(board[1])
+	aStarSolve(startnode, stopnode, board, height, width)
 }
