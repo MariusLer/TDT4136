@@ -24,13 +24,12 @@ type node struct {
 
 	weight int
 
+	block    bool
 	open     bool
 	closed   bool
 	solution bool // Is this part of best path?
-	block    bool
 
 	parent *node
-	//kids   []node // In golang []*node and []node both create a slice, so they are the same. Slices are references to an array
 }
 
 type nodes []*node
@@ -82,15 +81,29 @@ func readBoard(board string) (*node, *node, [][]node) {
 			tempNode := node{x: i, y: linecount}
 			tempNode.g = inf
 			tempNode.f = inf
-			tempNode.weight = 1
-			if c == '#' {
+			switch c {
+			case 'w':
+				tempNode.weight = 100
+			case 'm':
+				tempNode.weight = 50
+			case 'f':
+				tempNode.weight = 10
+			case 'g':
+				tempNode.weight = 5
+			case 'r':
+				tempNode.weight = 1
+			case '.':
+				tempNode.weight = 1
+			case '#':
 				tempNode.block = true
-			} else if c == 'A' {
+			case 'A':
 				startnodeX = i
 				startnodeY = linecount
-			} else if c == 'B' {
+				tempNode.weight = 1
+			case 'B':
 				endnodeX = i
 				endnodeY = linecount
+				tempNode.weight = 1
 			}
 			tempNodeRow = append(tempNodeRow, tempNode)
 		}
@@ -144,6 +157,81 @@ func printPath(board [][]node, stopnode *node, startnode *node) {
 	fmt.Println("Y: ", current.y, "X: ", current.x)
 }
 
+func bfsSolve(startnode *node, stopnode *node, board [][]node, height int, width int) bool {
+	height = len(board)
+	width = len(board[0])
+	open := make([]*node, 1)
+	closed := make([]*node, 0)
+	open[0] = startnode
+	open[0].solution = true
+	// Algorithm loop
+	for len(open) != 0 {
+		current := open[0]
+		open = open[1:] // pops open
+		fmt.Println("Current", *current)
+		if current.x == stopnode.x && current.y == stopnode.y { // done
+			return true
+		}
+		current.open = false
+		current.closed = true
+		closed = append(closed, current)
+
+		neighbors := findNeighbors(board, height, width, current)
+		for _, node := range neighbors {
+			if !nodeInSet(node, open) && !nodeInSet(node, closed) {
+				open = append(open, node)
+				node.open = true
+				node.parent = current
+			}
+
+		}
+	}
+	return false
+}
+
+func dijkstraSolve(startnode *node, stopnode *node, board [][]node, height int, width int) bool {
+	height = len(board)
+	width = len(board[0])
+	open := make([]*node, 1)
+	closed := make([]*node, 0)
+	open[0] = startnode
+	open[0].g = 0 // startnode cost zero
+	open[0].solution = true
+	// Algorithm loop
+	for len(open) != 0 {
+		current := open[0]
+		fmt.Println("Current", *current)
+		if current.x == stopnode.x && current.y == stopnode.y { // done
+			return true
+		}
+		open = open[1:] // pops open
+		current.open = false
+		current.closed = true
+		closed = append(closed, current)
+
+		neighbors := findNeighbors(board, height, width, current)
+		for _, node := range neighbors {
+			if nodeInSet(node, closed) {
+				continue // done with this node
+			}
+			if !nodeInSet(node, open) {
+				open = append(open, node)
+				node.open = true
+			}
+			tempg := current.g + node.weight
+			if tempg >= node.g { // did not find a better path
+				continue
+			}
+			// This path is best
+			node.parent = current
+			node.g = tempg
+			node.f = tempg
+		}
+		sort.Sort(nodes(open))
+	}
+	return false
+}
+
 func aStarSolve(startnode *node, stopnode *node, board [][]node, height int, width int) bool {
 	height = len(board)
 	width = len(board[0])
@@ -156,7 +244,7 @@ func aStarSolve(startnode *node, stopnode *node, board [][]node, height int, wid
 	// Algorithm loop
 	for len(open) != 0 {
 		current := open[0]
-		fmt.Println("Current", *current, "Estimate of dist: ", current.f)
+		fmt.Println("Current", *current)
 		if current.x == stopnode.x && current.y == stopnode.y { // done
 			return true
 		}
@@ -213,7 +301,15 @@ func drawBorders(img *image.RGBA) {
 	}
 }
 
-func drawCircle(img *image.RGBA, color color.RGBA, row int, col int) {
+func drawSmallRect(img *image.RGBA, color color.RGBA, row int, col int) {
+	for i := row*22 + 1; i < row*22+5; i++ {
+		for j := col*22 + 1; j < col*22+5; j++ {
+			img.Set(j, i, color)
+		}
+	}
+}
+
+func drawDisk(img *image.RGBA, color color.RGBA, row int, col int) {
 	var radius = 5.2
 	var centerX = row*22 + 11
 	var centerY = col*22 + 11
@@ -227,15 +323,7 @@ func drawCircle(img *image.RGBA, color color.RGBA, row int, col int) {
 	}
 }
 
-func drawSmallRect(img *image.RGBA, color color.RGBA, row int, col int) {
-	for i := row*22 + 1; i < row*22+5; i++ {
-		for j := col*22 + 1; j < col*22+5; j++ {
-			img.Set(j, i, color)
-		}
-	}
-}
-
-func drawImage(board [][]node, startnode *node, stopnode *node, filename string) {
+func drawImage(board [][]node, startnode *node, stopnode *node, filename string, algorithm string) {
 	// Creating squares of size 20x20 with borders
 	height := len(board)
 	width := len(board[0])
@@ -244,47 +332,69 @@ func drawImage(board [][]node, startnode *node, stopnode *node, filename string)
 	drawBorders(img)
 	for i := range board {
 		for j := range board[i] {
-			colorRectangle(img, color.RGBA{230, 230, 230, 255}, i, j)
-			if board[i][j].block {
-				colorRectangle(img, color.RGBA{75, 75, 75, 255}, i, j)
-			}
 			if &board[i][j] == startnode {
 				colorRectangle(img, color.RGBA{255, 0, 0, 255}, i, j)
+				drawDisk(img, color.RGBA{0, 255, 255, 255}, i, j)
+				continue
 			}
 			if &board[i][j] == stopnode {
 				colorRectangle(img, color.RGBA{0, 255, 0, 255}, i, j)
+				drawDisk(img, color.RGBA{0, 255, 255, 255}, i, j)
+				continue
+			}
+			if board[i][j].block {
+				colorRectangle(img, color.RGBA{75, 75, 75, 255}, i, j)
+				continue
+			}
+			switch board[i][j].weight {
+			case 1:
+				colorRectangle(img, color.RGBA{139, 69, 9, 255}, i, j)
+			case 5:
+				colorRectangle(img, color.RGBA{152, 251, 152, 255}, i, j)
+			case 10:
+				colorRectangle(img, color.RGBA{0, 100, 0, 255}, i, j)
+			case 50:
+				colorRectangle(img, color.RGBA{205, 200, 177, 255}, i, j)
+			case 100:
+				colorRectangle(img, color.RGBA{65, 105, 225, 255}, i, j)
 			}
 			if board[i][j].solution {
-				drawCircle(img, color.RGBA{0, 0, 255, 255}, i, j)
+				drawDisk(img, color.RGBA{0, 255, 255, 255}, i, j)
 			}
 			if board[i][j].closed {
 				drawSmallRect(img, color.RGBA{255, 0, 255, 255}, i, j)
 			}
+			if board[i][j].open {
+				drawSmallRect(img, color.RGBA{255, 255, 0, 255}, i, j)
+			}
 		}
 	}
 
-	file, _ := os.Create(filename)
+	filedir := algorithm + "/" + filename
+	file, _ := os.Create(filedir)
 	defer file.Close()
 	png.Encode(file, img)
 }
 
 func main() {
 	var file = os.Args[1]
+	var algorithm = strings.ToLower(os.Args[2])
 	startnode, stopnode, board := readBoard(file)
-	/*
-			for _, row := range board {
-				for _, node := range row {
-					fmt.Print(node)
-				}
-				fmt.Println()
-			}
-		fmt.Println(startnode)
-		fmt.Println(stopnode)
-	*/
+
 	height := len(board)
 	width := len(board[1])
-	aStarSolve(startnode, stopnode, board, height, width)
+	switch algorithm {
+	case "astar":
+		aStarSolve(startnode, stopnode, board, height, width)
+	case "dijkstra":
+		dijkstraSolve(startnode, stopnode, board, height, width)
+	case "bfs":
+		bfsSolve(startnode, stopnode, board, height, width)
+	default:
+		fmt.Println("Unknown algorithm exiting")
+		return
+	}
 	printPath(board, stopnode, startnode)
 	imagename := strings.Replace(string(file), "txt", "png", -1)
-	drawImage(board, startnode, stopnode, imagename)
+	drawImage(board, startnode, stopnode, imagename, algorithm)
 }
