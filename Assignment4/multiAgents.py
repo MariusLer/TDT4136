@@ -132,6 +132,8 @@ class MinimaxAgent(MultiAgentSearchAgent):
         bestValueAction = self.maximize(gameState, 0)
         return bestValueAction[1]
 
+    # I used a touple to hold the bestvalue and bestaction found in every step. Althoug the best action is actually only needed for the last step when we return action
+
     def maximize(self, gameState, currentDepth):   #// want to maximize own utility
             if currentDepth == self.depth or gameState.isWin() or gameState.isLose(): # Reached terminal nodes
                 return (self.evaluationFunction(gameState),None)
@@ -140,9 +142,9 @@ class MinimaxAgent(MultiAgentSearchAgent):
             for action in actions:
                 successor = gameState.generateSuccessor(0,action)
                 successorValue = self.minimize(successor,currentDepth,1) # Ghosts mimimize utility
-                if successorValue[0] > bestValueAction[0]:
+                if successorValue[0] > bestValueAction[0]:  # Found a better path
                     bestValueAction = (successorValue[0],action)
-            return bestValueAction
+            return bestValueAction # return the best possible value and action found
 
     def minimize(self,gameState, currentDepth, agentIndex): # ghosts time to minimize utility
             if gameState.isWin() or gameState.isLose(): # Reached terminal nodes
@@ -155,10 +157,10 @@ class MinimaxAgent(MultiAgentSearchAgent):
                 if agentIndex == numbAgents-1:  # Check if we are the last ghost to run minimize, if so run maximize on pacman again
                     successorValue = self.maximize(successor, currentDepth+1)
                 else:
-                    successorValue = self.minimize(successor, currentDepth, agentIndex+1)
-                if successorValue[0] < bestValueAction[0]:
+                    successorValue = self.minimize(successor, currentDepth, agentIndex+1) # There are more ghosts, so we have to run minimize again
+                if successorValue[0] < bestValueAction[0]: # Value that minimizes found
                     bestValueAction = (successorValue[0],action)
-            return bestValueAction
+            return bestValueAction # Return lowest value/action found
 
 class AlphaBetaAgent(MultiAgentSearchAgent):
     """
@@ -170,19 +172,22 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
           Returns the minimax action using self.depth and self.evaluationFunction
         """
         "*** YOUR CODE HERE ***"
-        bestValueAction = self.maximize(gameState, 0)
+        bestValueAction = self.maximize(gameState, 0, float("-inf"), float("inf"))
         return bestValueAction[1]
 
     def maximize(self, gameState, currentDepth, alpha, beta):   #// want to maximize own utility
-            if currentDepth == self.depth or gameState.isWin() or gameState.isLose(): # Reached terminal nodes
-                return (self.evaluationFunction(gameState),None)
-            bestValueAction = (float("-inf"),"")
+            if currentDepth == self.depth or gameState.isWin() or gameState.isLose(): # Reached terminal nodes or lost
+                return (self.evaluationFunction(gameState),None)  # Return none for no action here
+            bestValueAction = (float("-inf"),"")   # initialize best value and action
             actions = gameState.getLegalActions(0)
             for action in actions:
                 successor = gameState.generateSuccessor(0,action)
-                successorValue = self.minimize(successor,currentDepth,1) # Ghosts mimimize utility
+                successorValue = self.minimize(successor,currentDepth,1,alpha,beta) # Ghosts mimimize utility of pacman
                 if successorValue[0] > bestValueAction[0]:
                     bestValueAction = (successorValue[0],action)
+                if bestValueAction[0] > beta:
+                    return bestValueAction
+                alpha = max(alpha, bestValueAction[0])
             return bestValueAction
 
     def minimize(self, gameState, currentDepth, agentIndex, alpha, beta): # ghosts time to minimize utility
@@ -194,11 +199,14 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
             for action in actions:
                 successor = gameState.generateSuccessor(agentIndex,action)
                 if agentIndex == numbAgents-1:
-                    successorValue = self.maximize(successor, currentDepth+1)
+                    successorValue = self.maximize(successor, currentDepth+1,alpha,beta)
                 else:
-                    successorValue = self.minimize(successor, currentDepth, agentIndex+1)
+                    successorValue = self.minimize(successor, currentDepth, agentIndex+1,alpha,beta)
                 if successorValue[0] < bestValueAction[0]:
                     bestValueAction = (successorValue[0],action)
+                if bestValueAction[0] < alpha:
+                    return bestValueAction
+                beta = min(beta, bestValueAction[0])
             return bestValueAction
 
 
