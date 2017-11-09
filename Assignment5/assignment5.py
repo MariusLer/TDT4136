@@ -119,6 +119,7 @@ class CSP:
         for i in assignment:
             if len(assignment[i])!=1:
                 complete = False
+                break
         if complete:
             return assignment
 
@@ -135,7 +136,7 @@ class CSP:
                 result = self.backtrack(assignment_copy)
                 if result:
                     return result
-        # Else we failed to solve the board
+        # Else we failed to solve the board with this assignment
         self.times_failure += 1
         return False
 
@@ -161,9 +162,10 @@ class CSP:
             i=arc[0]
             j=arc[1]
             if self.revise(assignment,i,j):
-                if len(assignment[i]) == 0: # If variable have no domain
+                if len(assignment[i]) == 0: # If variable have no domain. Can't find solution
                     return False
                 # Find al neighboring arcs of i and add them (except the one to j)
+                # Must do this because if we changed the domain of i this could cause a reduction in the domains of all the neighbors of i
                 for arc2 in self.get_all_neighboring_arcs(i):
                     if arc2[0] != j:
                         queue.append((arc2[0],i))
@@ -190,7 +192,7 @@ class CSP:
                     satisfied=True
             if satisfied==False:  # No value allows the constraint to be satisfied
                 assignment[i].remove(i_value)  # Remove this from legal values for i
-                revised = True
+                revised = True # We revised (Reduced domain of i)
         return revised
 
 def create_map_coloring_csp():
